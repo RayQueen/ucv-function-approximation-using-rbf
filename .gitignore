@@ -1,0 +1,11 @@
+# Todo lo que no sea el .tex y .pdf en la carpeta docs
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+
+# Carpeta pycache
+src/__pycache__/
