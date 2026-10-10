@@ -49,7 +49,7 @@ tabsize=4,
     top=25mm,
     bottom=25mm
 }
-\graphicspath{{C:/Users/mishi/projects/LaTeX}} % Path for images
+\graphicspath{{../img/}} % Path relative to this file
 
 \title{Aproximación de Funciones mediante Redes de Base Radial (RBF)} % Document title
 \author{María Laura Reina y Victoria Ruza} % Document author
@@ -79,10 +79,112 @@ tabsize=4,
     \newpage
     \pagenumbering{arabic}
 
+    \section{Objetivos}
+        \subsection{Objetivo General}
+        \begin{itemize}
+            \item Implementar y evaluar la aproximación de funciones mediante el uso de redes de base radial (RBF) en el contexto de problemas de interpolación.
+        \end{itemize}
+        \subsection{Objetivos Específicos}
+        \begin{itemize}
+            \item Comprender el fundamento matemático de las redes de base radial y su aplicación en la interpolación de funciones.
+            \item Implementar un modelo de RBF en Python para aproximar funciones a partir de un conjunto de datos de entrenamiento.
+            \item Analizar el efecto del parámetro de forma $\epsilon$ en la calidad de la aproximación y en la estabilidad numérica del sistema lineal resultante.
+            \item Visualizar los resultados obtenidos mediante gráficos tridimensionales que representen la superficie aproximada y los puntos de entrenamiento.
+        \end{itemize}
+    \newpage
+
+    \section{Fundamento Matematico y Derivación del Sistema Lineal}
+        Dado un conjunto de $n$ datos de entrenamiento $\{(\mathbf{x}_i, z_i)\}_{i=1}^{n}$, donde $\mathbf{x}_i = (x_i, y_i) \in \mathbb{R}^2$ representa la posición en el plano y $z_i \in \mathbb{R}$ es el valor de la función en esa posición, queremos encontrar una función de interpolación $s(\mathbf{x})$ que pase por todos los puntos de entrenamiento. La forma general de la interpolación RBF es:
+        \begin{equation}
+            s(\mathbf{x}) = \sum_{j=1}^{n} w_j \phi\left(\Vert{}\mathbf{x} - \mathbf{x}_j\Vert{}\right)
+        \end{equation}
+
+        En esta formulación, $w_j$ son los coeficientes o pesos desconocidos de la red, $\Vert{}\mathbf{x} - \mathbf{x}_j\Vert{} = \sqrt{(x - x_j)^2 + (y - y_j)^2}$ es la distancia euclidiana entre el punto de evaluación $\mathbf{x}$ y el $j$-ésimo centro $\mathbf{x}_j$, y $\phi(r)$ representa la función del kernel gaussiano:
+        \begin{equation}
+            \phi(r) = \exp\left(-(\epsilon r)^2\right)
+        \end{equation}
+
+        El parámetro de forma $\epsilon > 0$ determina el nivel de concentración de cada base local. Para determinar el vector de pesos $\mathbf{w} = [w_1, w_2, \dots, w_n]^T$, se exige originalmente la condición de ajuste sobre los $n$ puntos conocidos $s(\mathbf{x}_i) = z_i$ para todo $i = 1, \dots, n$, derivando en el sistema de ecuaciones:
+        \begin{equation}
+            \sum_{j=1}^{n} w_j \exp\left(-\epsilon^2 \left[(x_i - x_j)^2 + (y_i - y_j)^2\right]\right) = z_i, \quad i=1,\dots,n
+        \end{equation}
+
+        Matricialmente, esta condición de interpolación adopta la forma de un sistema algebraico lineal:
+        \begin{equation}
+            \mathbf{\Phi} \mathbf{w} = \mathbf{z}
+        \end{equation}
+
+        La matriz $\mathbf{\Phi} \in \mathbb{R}^{n \times n}$ es la matriz de interpolación o del kernel, cuyos componentes están definidos por $\Phi_{ij} = \phi(\Vert{}\mathbf{x}_i - \mathbf{x}_j\Vert{}) = \exp\left(-\epsilon^2 d_{ij}^2\right)$. Cuando las observaciones contienen errores o ruido estocástico $\mathbf{z} = f(\mathbf{x}) + \boldsymbol{\eta}$, la resolución directa del sistema original impone un ajuste exacto sobre las perturbaciones, produciendo pesos $w_j$ excesivamente grandes y de alta varianza.
+
+        Para estabilizar la solución frente a estas fluctuaciones y acondicionar la matriz del sistema, se incorpora la regularización de Tikhonov. La estrategia consiste en resolver un problema de minimización de mínimos cuadrados penalizados, donde se busca equilibrar el residuo cuadrático con la magnitud de los pesos:
+        \begin{equation}
+            \min_{\mathbf{w}} \left\{ \Vert{}\mathbf{\Phi} \mathbf{w} - \mathbf{z}\Vert_2^2 + \lambda \Vert{}\mathbf{w}\Vert_2^2 \right\}
+        \end{equation}
+
+        Donde calculando la derivada de esta función de costo con respecto a $\mathbf{w}$ e igualando a cero, se obtiene el sistema lineal regularizado definitivo:
+        \begin{equation}
+            (\mathbf{\Phi} + \lambda \mathbf{I}) \mathbf{w} = \mathbf{z}
+        \end{equation}
+
+        Donde $\mathbf{I} \in \mathbb{R}^{n \times n}$ es la matriz identidad y $\lambda > 0$ representa el parámetro de regularización.
+
+    \section{Implementación Computacional}
+        El modelo fue implementado en el lenguaje Python mediante el script \texttt{AutomatedLearning.py}. La generación del conjunto de entrenamiento se gestiona a través de la función \texttt{genData}, la cual construye $n=100$ puntos distribuidos de forma uniforme en el rango $[-2, 2] \times [-2, 2]$ para las coordenadas $x$ e $y$. La respuesta de referencia se calcula mediante la función no lineal $z = \sin(x)\cos(y)$, a la cual se le adiciona una perturbación aleatoria gaussiana con desviación estándar $\sigma = 0.1$ mediante la rutina \texttt{np.random.normal}.
+
+        La matriz del kernel se construye en la función \texttt{buildKernelMatrix}. A través de un doble bucle iterativo sobre los $n$ puntos de entrada, se calcula la distancia euclidiana al cuadrado $d_{ij}^2 = (x_i - x_j)^2 + (y_i - y_j)^2$ y se asigna el valor del kernel gaussiano $\exp(-\epsilon^2 d_{ij}^2)$ a la celda $(i,j)$ de la matriz $\mathbf{\Phi}$.
+
+        La resolución del sistema lineal se lleva a cabo dentro de la función \texttt{solveRegularizedSystem}. En ella, se crea la matriz modificada $A = \mathbf{\Phi} + \lambda \mathbf{I}$ añadiendo el término lambdaReg ($\lambda = 10^{-6}$) a la diagonal principal mediante \texttt{np.eye(n)}. La obtención del vector de pesos $\mathbf{w}$ se efectúa a través de \texttt{np.linalg.solve(A, z)}, un ejecutor optimizado de álgebra lineal basado en factorizaciones matriciales estables.
+
+        Para la etapa de inferencia y visualización, la función \texttt{evaluatePoint} realiza la suma ponderada del modelo sobre cualquier punto discreto del plano. Finalmente, la función \texttt{visualizeSurface} construye una malla regular uniforme de $50 \times 50$ puntos utilizando \texttt{np.linspace} y \texttt{np.meshgrid}, sobre la cual se evalúa la red ajustada para generar las representaciones tridimensionales de la superficie de predicción en conjunto con los puntos de entrenamiento.
+
+    \section{Estudio del Parámetro de Forma $\epsilon$ y del Fenómeno de Oscilación Numérica}
+        El parámetro de forma $\epsilon$ actúa como la escala espacial que define el radio de influencia efectiva de cada kernel gaussiano. En los experimentos realizados se evaluaron tres configuraciones utilizando un valor base de $\epsilon = 1.5$, analizando los casos $\epsilon = 0.075$ (pequeño), $\epsilon = 1.500$ (óptimo) y $\epsilon = 7.500$ (grande).
+
+        El fenómeno de oscilación numérica cuando $\epsilon \to 0$ no es una manifestación presente en las tres gráficas por igual, sino una patología de instabilidad numérica que ocurre de manera exclusiva e intensa en la primera configuración correspondiente a un $\epsilon$ pequeño. A medida que $\epsilon$ se aproxima a cero, el término $\exp(-(\epsilon r)^2)$ tiende a cero para cualquier distancia $r$, provocando que el valor del kernel $\phi(r) = \exp(-(\epsilon r)^2)$ se aproxima a la constante $1$ en toda la extensión del dominio.
+
+        Como consecuencia directa de este comportamiento, todas las filas y columnas de la matriz $\mathbf{\Phi}$ se vuelven casi idénticas, perdiendo su independencia lineal. Desde la perspectiva del análisis numérico, el número de condición de la matriz se dispara exponencialmente hacia el infinito, convirtiendo a $\mathbf{\Phi}$ en una matriz severamente mal condicionada. Al resolver el sistema lineal en aritmética de punto flotante de precisión finita, los inevitables errores de redondeo se ven masivamente amplificados. El resolvedor algebraico responde asignando al vector $\mathbf{w}$ pesos gigantescos con signos fuertemente alternados para intentar cancelar las dependencias lineales casi perfectas. Esto se manifiesta en la primera gráfica como una superficie caótica con inestabilidades e hiperboloides de oscilación numérica extrema, donde el modelo pierde cualquier relación con la función original subyacente. 
+
+        \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.45\textwidth]{epsilon_0.08.png}
+        \caption{Oscilación numérica para $\epsilon = 0.075$.}
+        \end{figure}
+
+        En el segundo escenario con un valor óptimo de $\epsilon = 1.500$, las funciones gaussianas poseen un ancho de soporte intermedio. Los núcleos locales se solapan en un grado adecuado para permitir la interpolación fluida entre puntos vecinos sin deteriorar el condicionamiento de la matriz del kernel. La superficie reconstruida en la segunda gráfica resulta suave, bien comportada y fiel a la geometría original de la función $\sin(x)\cos(y)$.
+
+        \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.45\textwidth]{epsilon_1.50.png}
+        \caption{Interpolación suave para $\epsilon = 1.500$.}
+        \end{figure}
+
+        \newpage
+
+        En el tercer escenario con un valor grande de $\epsilon = 7.500$, las gaussianas sufren un decaimiento extremadamente rápido, colapsando a picos locales muy angostos. Cuando $r > 0$, la respuesta del kernel cae casi inmediatamente a cero, haciendo que los elementos fuera de la diagonal de la matriz $\mathbf{\Phi}$ se extingan ($\mathbf{\Phi} \approx \mathbf{I}$). Como se observa en la tercera gráfica, las funciones locales no llegan a solaparse entre sí, perdiendo por completo la capacidad de interpolación continua entre datos adyacentes. El modelo genera una superficie plana sobre el cero con pequeños picos aislados o prominencias en la posición exacta de cada dato de entrenamiento, fenómeno conocido técnicamente como el efecto cama de clavos.
+
+        \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.45\textwidth]{epsilon_7.50.png}
+        \caption{Efecto cama de clavos para $\epsilon = 7.500$.}
+        \end{figure}
+
+        \newpage
+
+    \section{La Regulación de Tikhonov ($\lambda$) y Filtrado de Ruido}
+        Cuando un conjunto de datos contiene ruido aleatorio, los valores de entrenamiento se pueden expresar como $z_i = f(x_i, y_i) + \eta_i$, donde $\eta_i$ representa la perturbación estocástica. Si se intenta resolver el sistema de forma exacta sin regularización ($\lambda = 0$), el modelo se ve forzado a pasar rigurosamente por cada punto con ruido. Para lograr esto, el algoritmo asigna coeficientes $w_j$ exageradamente grandes y con signos alternados, lo que deforma la superficie de manera abrupta para memorizar los errores de la muestra, generando un grave problema de sobreajuste. La superficie resultante exhibe oscilaciones extremas y picos artificiales que no reflejan la tendencia subyacente de la función original.
+
+        La introducción de la regularización de Tikhonov mediante el término $\lambda \Vert{}\mathbf{w}\Vert{}_2^2$ (con $\lambda = 10^{-6}$) presente en su respectivo problema de minimos cuadrados, soluciona este inconveniente limitando la magnitud de los pesos. Al penalizar la norma del vector de pesos, la regularización actúa directamente como un filtro de alta frecuencia: le prohíbe al modelo utilizar fluctuaciones violentas o pendientes desproporcionadas para capturar las pequeñas variaciones del ruido.
+
+        En consecuencia, el sistema deja de buscar una interpolación exacta y pasa a realizar una aproximación suave. Esto permite que la superficie reconstruida ignore el ruido estocástico presente en los datos de entrenamiento y se concentre en trazar la tendencia continua y real de la función subyacente, garantizando además que la matriz del sistema mantenga un buen condicionamiento numérico y una estabilidad algebraica óptima.
+
+    \newpage
+
     \section{Referencias}
     \begin{itemize}
         \item Radial Basis Interpolation by jessebett. (n.d.). \url{https://www.cs.toronto.edu/~jessebett/projects/radial-basis-functions/}
         \item Mongillo, M., 2011. Choosing Basis Functions and Shape Parameters for Radial Basis Function Methods, Available at: \url{http://www.siam.org/students/siuro/vol4/S01084.pdf}
+        \item Elsevier. (s.f.). Tikhonov Regularization. \url{https://www.sciencedirect.com/topics/computer-science/tikhonov-regularization}
     \end{itemize}
+
 
 \end{document}
